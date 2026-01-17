@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI-Driven Engineering Wave</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 100%;
+  min-height: 300vh;
+  background: #000000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  cursor: crosshair;
+}
+
+#waveCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  z-index: 1;
+}
+
+.content {
+  position: fixed;
+  top: 35%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 10;
+  pointer-events: none;
+  width: 90%;
+  max-width: 1200px;
+  transition: opacity 0.5s ease;
+}
+
+h1 {
+  font-size: clamp(2rem, 6vw, 5rem);
+  font-weight: 300;
+  color: #ffffff;
+  margin-bottom: 1.5rem;
+  line-height: 1.2;
+}
+
+p {
+  font-size: clamp(0.9rem, 1.5vw, 1.2rem);
+  color: #cccccc;
+  font-weight: 300;
+  max-width: 800px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.scroll-indicator {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #0D82E4;
+  font-size: 0.9rem;
+  z-index: 10;
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateX(-50%) translateY(0); }
+  40% { transform: translateX(-50%) translateY(-10px); }
+  60% { transform: translateX(-50%) translateY(-5px); }
+}
+</style>
+</head>
+<body>
+<div class="content" id="textContent">
+  <h1><b>ZEPHVION</b></h1>
+  <p>TRUST TODAY TRANSFORM TOMORROW</p>
+</div>
+<canvas id="waveCanvas"></canvas>
+<div class="scroll-indicator" id="scrollIndicator">↓ Scroll to explore</div>
+
+<script>
+const canvas = document.getElementById('waveCanvas');
+const ctx = canvas.getContext('2d');
+const textContent = document.getElementById('textContent');
+const scrollIndicator = document.getElementById('scrollIndicator');
+
+let width = window.innerWidth;
+let height = window.innerHeight;
+let time = 0;
+let mouseX = width / 2;
+let mouseY = height / 2;
+let targetMouseX = width / 2;
+let targetMouseY = height / 2;
+let scrollProgress = 0;
+
+const config = {
+  mesh1: {
+    horizontalLines: 35,
+    verticalLines: 90,
+    waveAmplitude: 48,
+    waveFrequency: 0.0055,
+    speed: 1.2,
+    verticalRange: 120,
+    centerOffset: 80,
+    opacity: 0.82,
+    phaseShift: 0,
+    scatterDirection: -1
+  },
+  mesh2: {
+    horizontalLines: 33,
+    verticalLines: 86,
+    waveAmplitude: 52,
+    waveFrequency: 0.005,
+    speed: 1.35,
+    verticalRange: 135,
+    centerOffset: 106,
+    opacity: 0.72,
+    phaseShift: 2.5,
+    scatterDirection: 1
+  },
+  mesh3: {
+    horizontalLines: 28,
+    verticalLines: 75,
+    waveAmplitude: 43,
+    waveFrequency: 0.006,
+    speed: 1.1,
+    verticalRange: 108,
+    centerOffset: 90,
+    opacity: 0.68,
+    phaseShift: 5,
+    scatterDirection: -0.5
+  },
+  color: '#0D82E4',
+  glowIntensity: 10,
+  lineWidth: 1.1,
+  mouseInfluence: 0.00015
+};
+
+function resize() {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+}
+
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : { r: 13, g: 130, b: 228 };
+}
+
+window.addEventListener('scroll', () => {
+  const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+  const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+  scrollProgress = Math.min(scrollTop / docHeight, 1);
+  
+  const textOpacity = Math.max(0, 1 - scrollProgress * 2);
+  textContent.style.opacity = textOpacity;
+  
+  const indicatorOpacity = Math.max(0, 1 - scrollProgress * 3);
+  scrollIndicator.style.opacity = indicatorOpacity;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  targetMouseX = e.clientX;
+  targetMouseY = e.clientY;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  targetMouseX = width / 2;
+  targetMouseY = height / 2;
+});
+
+function isPointInTriangle(px, py, x1, y1, x2, y2, x3, y3) {
+  const area = Math.abs((x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1));
+  const area1 = Math.abs((x1 - px) * (y2 - py) - (x2 - px) * (y1 - py));
+  const area2 = Math.abs((x2 - px) * (y3 - py) - (x3 - px) * (y2 - py));
+  const area3 = Math.abs((x3 - px) * (y1 - py) - (x1 - px) * (y3 - py));
+  return Math.abs(area - (area1 + area2 + area3)) < 1;
+}
+
+function getLogoTarget(pointIndex, totalPoints) {
+  const logoSize = Math.min(width, height) * 0.35;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  
+  // Circle ring parameters (like letter O - hollow)
+  const outerRadius = logoSize;
+  const innerRadius = logoSize * 0.7; // Inner edge of the ring
+  const ringThickness = outerRadius - innerRadius;
+  
+  // Triangle parameters (equilateral, centered, smaller to fit inside)
+  const triangleSize = logoSize * 0.5;
+  const triangleTop = { x: centerX, y: centerY - triangleSize * 0.577 };
+  const triangleLeft = { x: centerX - triangleSize * 0.5, y: centerY + triangleSize * 0.289 };
+  const triangleRight = { x: centerX + triangleSize * 0.5, y: centerY + triangleSize * 0.289 };
+  
+  // 65% points for circle ring, 35% for triangle
+  const circlePointCount = Math.floor(totalPoints * 0.65);
+  
+  if (pointIndex < circlePointCount) {
+    // Circle RING - use better distribution for complete ring
+    // Use combination of angle and radius for uniform coverage
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    const baseAngle = pointIndex * goldenAngle;
+    
+    // Also add regular angular distribution for completeness
+    const regularAngle = (pointIndex / circlePointCount) * Math.PI * 2;
+    const blendFactor = (pointIndex % 10) / 10;
+    const angle = baseAngle * blendFactor + regularAngle * (1 - blendFactor);
+    
+    // Distribute evenly within ring thickness
+    const radiusStep = (pointIndex % 15) / 15;
+    const targetRadius = innerRadius + ringThickness * radiusStep;
+    
+    return {
+      x: centerX + Math.cos(angle) * targetRadius,
+      y: centerY + Math.sin(angle) * targetRadius,
+      type: 'circle'
+    };
+  } else {
+    // Triangle FILL points
+    const triIndex = pointIndex - circlePointCount;
+    const seed1 = triIndex * 2654435761;
+    const seed2 = (triIndex * 1103515245 + 12345);
+    const r1 = Math.sqrt((seed1 % 10000) / 10000);
+    const r2 = (seed2 % 10000) / 10000;
+    
+    const x = (1 - r1) * triangleTop.x + r1 * (1 - r2) * triangleLeft.x + r1 * r2 * triangleRight.x;
+    const y = (1 - r1) * triangleTop.y + r1 * (1 - r2) * triangleLeft.y + r1 * r2 * triangleRight.y;
+    
+    return { x, y, type: 'triangle' };
+  }
+}
+
+function getTrianglePoints(totalPoints) {
+  // Not needed anymore
+  return [];
+}
+
+function getWaveY(x, lineIndex, totalLines, meshConfig, t) {
+  const expansionPhase = Math.min(scrollProgress / 0.6, 1);
+  const formationPhase = Math.max(0, (scrollProgress - 0.6) / 0.4);
+  
+  const verticalSpreadFactor = 1 + Math.pow(expansionPhase, 1.2) * 25 * (1 - formationPhase * 0.95);
+  
+  const normalizedLine = (lineIndex / totalLines) - 0.5;
+  
+  const maxScatter = Math.pow(expansionPhase, 1.6) * height * 3.5;
+  const scatterDistance = maxScatter * (1 - formationPhase * 0.98);
+  const scatterOffset = normalizedLine * scatterDistance * meshConfig.scatterDirection;
+  
+  const centerY = height / 2 + meshConfig.centerOffset * (1 - scrollProgress * 0.9) + scatterOffset;
+  
+  const baseOffset = normalizedLine * meshConfig.verticalRange * verticalSpreadFactor;
+  
+  const edgeFade = Math.abs(normalizedLine);
+  const particleScatter = Math.pow(scrollProgress, 3) * edgeFade * 200 * Math.sin(lineIndex + t * 0.02) * (1 - formationPhase);
+  
+  const distanceToMouse = Math.sqrt(Math.pow(x - mouseX, 2) + Math.pow((centerY + baseOffset) - mouseY, 2));
+  const mouseEffect = Math.max(0, 1 - distanceToMouse * config.mouseInfluence) * 40 * (1 - formationPhase);
+  
+  const amplitudeMultiplier = (1 + scrollProgress * 0.8 - Math.pow(scrollProgress, 2) * 0.5) * (1 - formationPhase);
+  
+  const wave1 = Math.sin(x * meshConfig.waveFrequency + t * 0.012 + lineIndex * 0.11 + meshConfig.phaseShift) * meshConfig.waveAmplitude * amplitudeMultiplier;
+  const wave2 = Math.cos(x * meshConfig.waveFrequency * 1.35 + t * 0.016 - lineIndex * 0.08 + meshConfig.phaseShift * 0.7) * meshConfig.waveAmplitude * 0.6 * amplitudeMultiplier;
+  const wave3 = Math.sin(x * meshConfig.waveFrequency * 0.75 + t * 0.018 + lineIndex * 0.13 + meshConfig.phaseShift * 1.2) * meshConfig.waveAmplitude * 0.42 * amplitudeMultiplier;
+  const wave4 = Math.cos(x * meshConfig.waveFrequency * 1.8 + t * 0.01 + lineIndex * 0.09) * meshConfig.waveAmplitude * 0.3 * amplitudeMultiplier;
+  
+  const mouseDistortion = Math.sin(distanceToMouse * 0.01 + t * 0.02) * mouseEffect;
+  
+  const currentY = centerY + baseOffset + wave1 + wave2 + wave3 + wave4 + mouseDistortion + particleScatter;
+  
+  return currentY;
+}
+
+function drawMesh(meshConfig, timeMultiplier = 1) {
+  const color = hexToRgb(config.color);
+  const horizontalWaves = [];
+  
+  const baseOpacity = meshConfig.opacity;
+  
+  const particleTransition = Math.max(0, Math.min(1, (scrollProgress - 0.5) / 0.3));
+  const isParticleMode = scrollProgress > 0.5;
+  const formationPhase = Math.max(0, (scrollProgress - 0.6) / 0.4);
+  
+  for (let i = 0; i < meshConfig.horizontalLines; i++) {
+    const points = [];
+    
+    for (let v = 0; v <= meshConfig.verticalLines; v++) {
+      const x = (v / meshConfig.verticalLines) * width;
+      const y = getWaveY(x, i, meshConfig.horizontalLines, meshConfig, time * timeMultiplier);
+      
+      const totalPoints = meshConfig.horizontalLines * meshConfig.verticalLines;
+      const pointIndex = i * meshConfig.verticalLines + v;
+      const logoTarget = getLogoTarget(pointIndex, totalPoints);
+      
+      // Lerp towards logo during formation
+      const finalX = x * (1 - formationPhase) + logoTarget.x * formationPhase;
+      const finalY = y * (1 - formationPhase) + logoTarget.y * formationPhase;
+      
+      points.push({ x: finalX, y: finalY, type: logoTarget.type });
+    }
+    
+    horizontalWaves.push(points);
+    
+    const distanceFromCenter = Math.abs(i - meshConfig.horizontalLines / 2) / (meshConfig.horizontalLines / 2);
+    const opacityFade = 1 - (distanceFromCenter * 0.38);
+    const opacity = baseOpacity * opacityFade;
+    
+    if (opacity > 0.01) {
+      if (!isParticleMode || particleTransition < 1) {
+        const lineOpacity = opacity * (1 - particleTransition);
+        ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${lineOpacity})`;
+        ctx.lineWidth = config.lineWidth * (1 - particleTransition * 0.8);
+        ctx.shadowBlur = config.glowIntensity * (1 - particleTransition * 0.5);
+        ctx.shadowColor = `rgba(${color.r}, ${color.g}, ${color.b}, ${0.5 * (1 - particleTransition * 0.5)})`;
+        
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        
+        for (let j = 1; j < points.length - 2; j++) {
+          const xc = (points[j].x + points[j + 1].x) / 2;
+          const yc = (points[j].y + points[j + 1].y) / 2;
+          ctx.quadraticCurveTo(points[j].x, points[j].y, xc, yc);
+        }
+        
+        if (points.length > 2) {
+          ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+        }
+        
+        ctx.stroke();
+      }
+      
+      if (isParticleMode) {
+        const dotOpacity = opacity * particleTransition;
+        const scrollBeyondTransition = Math.max(0, (scrollProgress - 0.8) / 0.2);
+        const baseDotSize = 1.8 + particleTransition * 1.8;
+        const dotSize = Math.max(1.5, baseDotSize * (1 - scrollBeyondTransition * 0.3));
+        
+        // Draw dots with dark outline when fully formed
+        const outlineStrength = formationPhase;
+        
+        for (let p = 0; p < points.length; p++) {
+          // Dark outline
+          if (outlineStrength > 0.5) {
+            ctx.fillStyle = `rgba(0, 0, 0, ${0.8 * outlineStrength})`;
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(points[p].x, points[p].y, dotSize + 1.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          
+          // Bright dot
+          ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${dotOpacity})`;
+          ctx.shadowBlur = config.glowIntensity * (1.2 + formationPhase * 1) * particleTransition;
+          ctx.shadowColor = `rgba(${color.r}, ${color.g}, ${color.b}, ${0.9 * particleTransition})`;
+          ctx.beginPath();
+          ctx.arc(points[p].x, points[p].y, dotSize, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  }
+  
+  ctx.shadowBlur = config.glowIntensity * 0.5;
+  
+  if (scrollProgress < 0.5) {
+    const verticalLineStep = 1;
+    
+    for (let v = 0; v <= meshConfig.verticalLines; v += verticalLineStep) {
+      const avgOpacity = horizontalWaves.reduce((sum, wave, idx) => {
+        const distanceFromCenter = Math.abs(idx - meshConfig.horizontalLines / 2) / (meshConfig.horizontalLines / 2);
+        return sum + (1 - distanceFromCenter);
+      }, 0) / meshConfig.horizontalLines;
+      
+      const baseOpacityVertical = baseOpacity * 0.48 * avgOpacity;
+      
+      if (baseOpacityVertical > 0.01) {
+        ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${baseOpacityVertical})`;
+        ctx.lineWidth = config.lineWidth * 0.88;
+        
+        ctx.beginPath();
+        
+        for (let h = 0; h < meshConfig.horizontalLines; h++) {
+          const point = horizontalWaves[h][v];
+          
+          if (h === 0) {
+            ctx.moveTo(point.x, point.y);
+          } else {
+            ctx.lineTo(point.x, point.y);
+          }
+        }
+        
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+function draw() {
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, width, height);
+  
+  mouseX += (targetMouseX - mouseX) * 0.1;
+  mouseY += (targetMouseY - mouseY) * 0.1;
+  
+  drawMesh(config.mesh1, 1);
+  drawMesh(config.mesh2, 0.85);
+  drawMesh(config.mesh3, 1.15);
+  
+  time += config.mesh1.speed;
+  requestAnimationFrame(draw);
+}
+
+resize();
+window.addEventListener('resize', resize);
+draw();
+</script>
+</body>
+</html>
